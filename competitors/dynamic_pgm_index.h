@@ -69,8 +69,6 @@ class DynamicPGM : public Competitor<KeyType, SearchClass> {
     vec.push_back(std::to_string(pgm_error));
     return vec;
   }
-  
-  void clear() { pgm_.clear(); }
 
  private:
   DynamicPGMIndex<KeyType, uint64_t, SearchClass, PGMIndex<KeyType, SearchClass, pgm_error, 16>> pgm_;
