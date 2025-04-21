@@ -15,7 +15,7 @@ template <class KeyType, class SearchClass, size_t pgm_error>
 class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
  public:
   HybridPGMLIPP(const std::vector<int>& params) 
-    : dpgm_(params), lipp_(params), flush_threshold_(0.05) {}
+    : dpgm_(params), lipp_(params), flush_threshold_(0.25) {}
 
   uint64_t Build(const std::vector<KeyValue<KeyType>>& data, size_t num_threads) {
     // Initially build LIPP with all data
