@@ -44,7 +44,7 @@ class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
   void Insert(const KeyValue<KeyType>& data, uint32_t thread_id) {
     // Always insert into DPGM first
     dpgm_.Insert(data, thread_id);
-    
+    dpgm_data.emplace_back(data);
     // Check if we need to flush to LIPP
     if (dpgm_.size() >= flush_threshold_ * lipp_.size()) {
       FlushToLIPP();
@@ -69,30 +69,17 @@ class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
  private:
   void FlushToLIPP() {
     // Naive implementation: Extract data from DPGM and insert individually into LIPP
-    std::vector<KeyValue<KeyType>> dpgm_data;
-    
-    // Get all keys from DPGM
-    auto it = dpgm_.begin();
-    while (it != dpgm_.end()) {
-      KeyValue<KeyType> kv;
-      kv.key = it->key();
-      kv.value = it->value();
-      dpgm_data.push_back(kv);
-      ++it;
-    }
-
     // Insert each key-value pair into LIPP
     for (const auto& kv : dpgm_data) {
       lipp_.Insert(kv, 0);  // Using thread_id 0 for simplicity
     }
-
     // Clear DPGM after flushing
     dpgm_.clear();
+    dpgm_data.clear();
   }
 
   DynamicPGM<KeyType, SearchClass, pgm_error> dpgm_;
-  Lipp<KeyType> lipp_;  // Changed to match LIPP's actual interface
+  Lipp<KeyType> lipp_; 
+  std::vector<KeyValue<KeyType>> dpgm_data;
   double flush_threshold_;
 };
-
-#endif  // TLI_HYBRID_PGM_LIPP_H 
