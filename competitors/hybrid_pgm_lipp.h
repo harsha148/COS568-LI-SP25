@@ -74,7 +74,7 @@ class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
       lipp_.Insert(kv, 0);  // Using thread_id 0 for simplicity
     }
     // Clear DPGM after flushing
-    dpgm_ = DynamicPGM<KeyType, SearchClass, pgm_error>(std::vector<int>());
+    // dpgm_ = DynamicPGM<KeyType, SearchClass, pgm_error>(std::vector<int>());
     dpgm_data.clear();
   }
 
