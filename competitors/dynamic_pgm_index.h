@@ -70,6 +70,11 @@ class DynamicPGM : public Competitor<KeyType, SearchClass> {
     return vec;
   }
 
+  // Methods needed for hybrid implementation
+  auto begin() const { return pgm_.begin(); }
+  auto end() const { return pgm_.end(); }
+  void clear() { pgm_.clear(); }
+
  private:
   DynamicPGMIndex<KeyType, uint64_t, SearchClass, PGMIndex<KeyType, SearchClass, pgm_error, 16>> pgm_;
 };

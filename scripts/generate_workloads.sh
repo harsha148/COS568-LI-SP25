@@ -19,6 +19,6 @@ function generate_uint64_100M() {
 }
 
 
-for dataset in fb_100M_public_uint64 books_100M_public_uint64 osmc_100M_public_uint64; do
+for dataset in fb_100M_public_uint64; do
     generate_uint64_100M $dataset
 done
