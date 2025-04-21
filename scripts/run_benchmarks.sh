@@ -24,7 +24,7 @@ mkdir -p ./results
 
 for DATA in fb_100M_public_uint64 
 do
-for INDEX in LIPP DynamicPGM HybridPGMLIPP
+for INDEX in HybridPGMLIPP LIPP DynamicPGM 
 do
     execute_uint64_100M ${DATA} $INDEX
 done
