@@ -56,8 +56,7 @@ class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
   std::size_t size() const { return dpgm_.size() + lipp_.size(); }
 
   bool applicable(bool unique, bool range_query, bool insert, bool multithread, const std::string& ops_filename) const {
-    return dpgm_.applicable(unique, range_query, insert, multithread, ops_filename) &&
-           lipp_.applicable(unique, range_query, insert, multithread, ops_filename);
+    return !multithread;
   }
 
   std::vector<std::string> variants() const { 
