@@ -5,5 +5,5 @@
 
 void benchmark_64_hybrid_pgm_lipp(tli::Benchmark<uint64_t>& benchmark) {
   // Only run with default parameters
-  benchmark.template Run<HybridPGMLIPP<uint64_t, BranchingBinarySearch<16>, 16>>();
+  benchmark.template Run<HybridPGMLIPP<uint64_t, BranchingBinarySearch<0>, 16>>();
 }
