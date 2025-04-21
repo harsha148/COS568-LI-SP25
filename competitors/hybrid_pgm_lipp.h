@@ -15,7 +15,7 @@ template <class KeyType, class SearchClass, size_t pgm_error>
 class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
  public:
   HybridPGMLIPP(const std::vector<int>& params) 
-    : dpgm_(params), lipp_(params), flush_threshold_(0.25) {}
+    : dpgm_(params), lipp_(params), flush_threshold_(0.05) {}  // Reduced to 5%
 
   uint64_t Build(const std::vector<KeyValue<KeyType>>& data, size_t num_threads) {
     // Initially build LIPP with all data
@@ -45,8 +45,9 @@ class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
     // Always insert into DPGM first
     dpgm_.Insert(data, thread_id);
     dpgm_data.emplace_back(data);
-    // Check if we need to flush to LIPP
-    if (dpgm_.size() >= flush_threshold_ * lipp_.size()) {
+    
+    // Check if we need to flush to LIPP based on number of elements
+    if (dpgm_data.size() >= flush_threshold_ * lipp_.size()) {
       FlushToLIPP();
     }
   }
@@ -73,8 +74,9 @@ class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
     for (const auto& kv : dpgm_data) {
       lipp_.Insert(kv, 0);  // Using thread_id 0 for simplicity
     }
-    // Clear DPGM after flushing
-    // dpgm_ = DynamicPGM<KeyType, SearchClass, pgm_error>(std::vector<int>());
+    
+    // Clear DPGM and create a new instance
+    dpgm_ = DynamicPGM<KeyType, SearchClass, pgm_error>(std::vector<int>());
     dpgm_data.clear();
   }
 
@@ -83,6 +85,5 @@ class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
   std::vector<KeyValue<KeyType>> dpgm_data;
   double flush_threshold_;
 };
-
 
 #endif // TLI_HYBRID_PGM_LIPP_H
