@@ -83,3 +83,6 @@ class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
   std::vector<KeyValue<KeyType>> dpgm_data;
   double flush_threshold_;
 };
+
+
+#endif // TLI_HYBRID_PGM_LIPP_H
