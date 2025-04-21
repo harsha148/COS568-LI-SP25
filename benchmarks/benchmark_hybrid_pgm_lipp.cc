@@ -12,7 +12,7 @@ void benchmark_64_hybrid_pgm_lipp(tli::Benchmark<uint64_t>& benchmark,
     util::fail("HybridPGMLipp's hyperparameter cannot be set");
   } else {
     // We ignore params for Milestone 2 and fix pgm_error=16
-    benchmark.template Run<HybridPGMLipp<uint64_t, Searcher, 16>>(params);
+    benchmark.template Run<HybridPGMLIPP<uint64_t, Searcher, 16>>(params);
   }
 }
 
@@ -21,7 +21,7 @@ template <int record>
 void benchmark_64_hybrid_pgm_lipp(tli::Benchmark<uint64_t>& benchmark,
                                   const std::string& filename) {
   if (filename.find("fb_100M") != std::string::npos) {
-    benchmark.template Run<HybridPGMLipp<uint64_t, BranchingBinarySearch<record>, 16>>();
+    benchmark.template Run<HybridPGMLIPP<uint64_t, BranchingBinarySearch<record>, 16>>();
   }
 }
 
