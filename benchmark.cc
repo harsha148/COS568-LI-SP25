@@ -66,7 +66,7 @@ void execute_64_bit(tli::Benchmark<uint64_t>& benchmark, bool pareto,
   check_only("BTree", benchmark_64_btree<SearchClass>(benchmark, pareto, params));
   check_only("DynamicPGM", benchmark_64_dynamic_pgm<SearchClass>(benchmark, pareto, params));
   check_only("LIPP", benchmark_64_lipp(benchmark));
-  check_only("HybridPGMLIPP", benchmark_64_hybrid_pgm_lipp(benchmark));
+  check_only("HybridPGMLIPP", benchmark_64_hybrid_pgm_lipp<SearchClass>(benchmark,pareto,params));
 }
 
 // 2) Overload that doesn't pass a search class
@@ -79,7 +79,7 @@ void execute_64_bit(tli::Benchmark<uint64_t>& benchmark, bool only_mode,
   check_only("BTree", benchmark_64_btree<record>(benchmark, filename));
   check_only("DynamicPGM", benchmark_64_dynamic_pgm<record>(benchmark, filename));
   check_only("LIPP", benchmark_64_lipp(benchmark));
-  check_only("HybridPGMLIPP", benchmark_64_hybrid_pgm_lipp(benchmark));
+  check_only("HybridPGMLIPP", benchmark_64_hybrid_pgm_lipp<record>(benchmark,filename));
 }
 
 // We don't do string benchmarks in this minimal build
