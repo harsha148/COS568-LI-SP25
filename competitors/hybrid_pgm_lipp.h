@@ -5,6 +5,10 @@
 #include <cstdlib>
 #include <iostream>
 #include <vector>
+#include <thread>
+#include <mutex>
+#include <atomic>
+#include <chrono>
 
 #include "../util.h"
 #include "base.h"
@@ -15,7 +19,18 @@ template <class KeyType, class SearchClass, size_t pgm_error>
 class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
  public:
   HybridPGMLIPP(const std::vector<int>& params) 
-    : dpgm_(params), lipp_(params), flush_threshold_(0.05), lipp_element_count_(0) {}
+    : dpgm_(params), lipp_(params), 
+      flush_threshold_(0.05), 
+      lipp_element_count_(0),
+      is_flushing_(false),
+      insert_count_(0),
+      last_flush_time_(std::chrono::steady_clock::now()) {}
+
+  ~HybridPGMLIPP() {
+    if (flush_thread_.joinable()) {
+      flush_thread_.join();
+    }
+  }
 
   uint64_t Build(const std::vector<KeyValue<KeyType>>& data, size_t num_threads) {
     // Initially build LIPP with all data
@@ -43,13 +58,19 @@ class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
   }
 
   void Insert(const KeyValue<KeyType>& data, uint32_t thread_id) {
-    // Always insert into DPGM first
+    // Insert into DPGM
     dpgm_.Insert(data, thread_id);
-    dpgm_data.emplace_back(data);
     
-    // Check if we need to flush to LIPP based on number of elements
-    if (dpgm_data.size() >= flush_threshold_ * lipp_element_count_) {
-      FlushToLIPP();
+    // Add to buffer with lock
+    {
+      std::lock_guard<std::mutex> lock(buffer_mutex_);
+      dpgm_data.emplace_back(data);
+      insert_count_++;
+    }
+    
+    // Check if we need to trigger a flush
+    if (should_trigger_flush()) {
+      trigger_flush();
     }
   }
 
@@ -69,25 +90,79 @@ class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
   }
 
  private:
-  void FlushToLIPP() {
-    // Insert each key-value pair into LIPP
-    for (const auto& kv : dpgm_data) {
-      lipp_.Insert(kv, 0);  // Using thread_id 0 for simplicity
+  bool should_trigger_flush() {
+    // Check if we're already flushing
+    if (is_flushing_.load()) {
+      return false;
     }
-    
+
+    // Check size-based threshold
+    if (insert_count_.load() >= flush_threshold_ * lipp_element_count_) {
+      return true;
+    }
+
+    // Check time-based threshold (flush every 100ms if we have data)
+    auto now = std::chrono::steady_clock::now();
+    if (insert_count_.load() > 0 && 
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            now - last_flush_time_).count() > 100) {
+      return true;
+    }
+
+    return false;
+  }
+
+  void trigger_flush() {
+    // Try to acquire flush lock
+    bool expected = false;
+    if (is_flushing_.compare_exchange_strong(expected, true)) {
+      // Start async flush
+      if (flush_thread_.joinable()) {
+        flush_thread_.join();
+      }
+      flush_thread_ = std::thread(&HybridPGMLIPP::async_flush, this);
+    }
+  }
+
+  void async_flush() {
+    // Take snapshot of current data
+    std::vector<KeyValue<KeyType>> snapshot;
+    size_t count;
+    {
+      std::lock_guard<std::mutex> lock(buffer_mutex_);
+      snapshot.swap(dpgm_data);
+      count = insert_count_.load();
+      insert_count_ = 0;
+    }
+
+    // Insert into LIPP
+    for (const auto& kv : snapshot) {
+      lipp_.Insert(kv, 0);
+    }
+
     // Update LIPP element count
-    lipp_element_count_ += dpgm_data.size();
-    
-    // Clear DPGM and create a new instance
+    lipp_element_count_ += count;
+
+    // Clear DPGM and create new instance
     dpgm_ = DynamicPGM<KeyType, SearchClass, pgm_error>(std::vector<int>());
-    dpgm_data.clear();
+
+    // Update last flush time and release flush lock
+    last_flush_time_ = std::chrono::steady_clock::now();
+    is_flushing_.store(false);
   }
 
   DynamicPGM<KeyType, SearchClass, pgm_error> dpgm_;
   Lipp<KeyType> lipp_; 
   std::vector<KeyValue<KeyType>> dpgm_data;
+  std::mutex buffer_mutex_;
+  std::atomic<bool> is_flushing_;
+  std::atomic<size_t> insert_count_;
+  std::thread flush_thread_;
   double flush_threshold_;
-  size_t lipp_element_count_;  // Track number of elements in LIPP
+  size_t lipp_element_count_;
+  std::chrono::steady_clock::time_point last_flush_time_;
 };
 
 #endif // TLI_HYBRID_PGM_LIPP_H
+
+
