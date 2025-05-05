@@ -52,21 +52,24 @@ public:
         return std::vector<std::string>();
     }
 
-    void BulkLoad(std::vector<KeyValue<KeyType>>& data) {  // Removed const
-        // Sort if not already sorted
-        if (!std::is_sorted(data.begin(), data.end(), 
-            [](const auto& a, const auto& b) { return a.key < b.key; })) {
-            std::sort(data.begin(), data.end(), 
-                [](const auto& a, const auto& b) { return a.key < b.key; });
-        }
-
-        std::vector<std::pair<KeyType, uint64_t>> loading_data;
-        loading_data.reserve(data.size());
-        for (const auto& itm : data) {
-            loading_data.push_back(std::make_pair(itm.key, itm.value));
-        }
-        lipp_.bulk_load(loading_data.data(), loading_data.size());
+    void BulkLoad(const std::vector<KeyValue<KeyType>>& data) {
+    // Create a non-const copy
+    std::vector<KeyValue<KeyType>> sorted_data = data;
+    
+    // Sort the copy
+    if (!std::is_sorted(sorted_data.begin(), sorted_data.end(), 
+        [](const auto& a, const auto& b) { return a.key < b.key; })) {
+        std::sort(sorted_data.begin(), sorted_data.end(), 
+            [](const auto& a, const auto& b) { return a.key < b.key; });
     }
+
+    std::vector<std::pair<KeyType, uint64_t>> loading_data;
+    loading_data.reserve(sorted_data.size());
+    for (const auto& itm : sorted_data) {
+        loading_data.push_back(std::make_pair(itm.key, itm.value));
+    }
+    lipp_.bulk_load(loading_data.data(), loading_data.size());
+}
 
     std::size_t size() const { return lipp_.index_size(); } 
 private:
