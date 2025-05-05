@@ -52,7 +52,7 @@ public:
         return std::vector<std::string>();
     }
 
-    void BulkLoad(const std::vector<KeyValue<KeyType>>& data) {
+    void BulkLoad(std::vector<KeyValue<KeyType>>& data) {  // Removed const
         // Sort if not already sorted
         if (!std::is_sorted(data.begin(), data.end(), 
             [](const auto& a, const auto& b) { return a.key < b.key; })) {
