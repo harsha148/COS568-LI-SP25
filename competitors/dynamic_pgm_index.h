@@ -73,10 +73,10 @@ class DynamicPGM : public Competitor<KeyType, SearchClass> {
     /**
    * Completely reset the dynamic PGM back to empty.
    */
-  void clear() {
-    // Re‐assign pgm_ to a fresh, default‐constructed index
-    pgm_ = decltype(pgm_)();
-  }
+  // void clear() {
+  //   // Re‐assign pgm_ to a fresh, default‐constructed index
+  //   pgm_ = decltype(pgm_)();
+  // }
 
  private:
   DynamicPGMIndex<KeyType, uint64_t, SearchClass, PGMIndex<KeyType, SearchClass, pgm_error, 16>> pgm_;
