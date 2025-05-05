@@ -6,7 +6,7 @@ project(PiecewiseGeometricModelIndex
 option(BUILD_PGM_TUNER "Build the tuner target" ON)
 
 set(CMAKE_CXX_STANDARD 17)
-
+add_compile_options(-Wno-unused-but-set-variable)
 include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
 if (COMPILER_SUPPORTS_MARCH_NATIVE)
