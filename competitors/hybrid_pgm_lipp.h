@@ -20,11 +20,10 @@ class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
  public:
   HybridPGMLIPP(const std::vector<int>& params) 
     : dpgm_(params), lipp_(params), 
-      flush_threshold_(0.05), 
-      lipp_element_count_(0),
-      is_flushing_(false),
       insert_count_(0),
-      last_flush_time_(std::chrono::steady_clock::now()) {}
+      is_flushing_(false) {
+    flush_threshold_ = 100000;  // Fixed threshold
+  }
 
   ~HybridPGMLIPP() {
     if (flush_thread_.joinable()) {
@@ -33,16 +32,13 @@ class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
   }
 
   uint64_t Build(const std::vector<KeyValue<KeyType>>& data, size_t num_threads) {
-    // Initially build LIPP with all data
-    uint64_t build_time = lipp_.Build(data, num_threads);
-    lipp_element_count_ = data.size();  // Track initial number of elements
-    return build_time;
+    return lipp_.Build(data, num_threads);
   }
 
   size_t EqualityLookup(const KeyType& lookup_key, uint32_t thread_id) const {
-    // First check DPGM
+    // Always check DPGM first
     size_t dpgm_result = dpgm_.EqualityLookup(lookup_key, thread_id);
-    if (dpgm_result != util::OVERFLOW) {
+    if (dpgm_result != util::OVERFLOW && dpgm_result != util::NOT_FOUND) {
       return dpgm_result;
     }
     
@@ -51,26 +47,27 @@ class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
   }
 
   uint64_t RangeQuery(const KeyType& lower_key, const KeyType& upper_key, uint32_t thread_id) const {
-    // For range queries, we need to check both indexes
+    // Always check both indexes
     uint64_t dpgm_result = dpgm_.RangeQuery(lower_key, upper_key, thread_id);
     uint64_t lipp_result = lipp_.RangeQuery(lower_key, upper_key, thread_id);
     return dpgm_result + lipp_result;
   }
 
   void Insert(const KeyValue<KeyType>& data, uint32_t thread_id) {
-    // Insert into DPGM
-    dpgm_.Insert(data, thread_id);
-    
-    // Add to buffer with lock
+    // Always use DPGM and buffer for inserts
     {
       std::lock_guard<std::mutex> lock(buffer_mutex_);
       dpgm_data.emplace_back(data);
-      insert_count_++;
     }
-    
-    // Check if we need to trigger a flush
-    if (should_trigger_flush()) {
-      trigger_flush();
+    dpgm_.Insert(data, thread_id);
+    insert_count_++;
+
+    // Trigger flush if threshold reached
+    if (insert_count_ >= flush_threshold_ && !is_flushing_.exchange(true)) {
+      if (flush_thread_.joinable()) {
+        flush_thread_.join();
+      }
+      flush_thread_ = std::thread(&HybridPGMLIPP::async_flush, this);
     }
   }
 
@@ -90,65 +87,28 @@ class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
   }
 
  private:
-  bool should_trigger_flush() {
-    // Check if we're already flushing
-    if (is_flushing_.load()) {
-      return false;
-    }
-
-    // Check size-based threshold
-    if (insert_count_.load() >= flush_threshold_ * lipp_element_count_) {
-      return true;
-    }
-
-    // Check time-based threshold (flush every 100ms if we have data)
-    auto now = std::chrono::steady_clock::now();
-    if (insert_count_.load() > 0 && 
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            now - last_flush_time_).count() > 100) {
-      return true;
-    }
-
-    return false;
-  }
-
-  void trigger_flush() {
-    // Try to acquire flush lock
-    bool expected = false;
-    if (is_flushing_.compare_exchange_strong(expected, true)) {
-      // Start async flush
-      if (flush_thread_.joinable()) {
-        flush_thread_.join();
-      }
-      flush_thread_ = std::thread(&HybridPGMLIPP::async_flush, this);
-    }
-  }
-
   void async_flush() {
-    // Take snapshot of current data
-    std::vector<KeyValue<KeyType>> snapshot;
-    size_t count;
-    {
-      std::lock_guard<std::mutex> lock(buffer_mutex_);
-      snapshot.swap(dpgm_data);
-      count = insert_count_.load();
-      insert_count_ = 0;
+    try {
+      std::vector<KeyValue<KeyType>> snapshot;
+      {
+        std::lock_guard<std::mutex> lock(buffer_mutex_);
+        snapshot.swap(dpgm_data);
+        insert_count_ = 0;
+      }
+
+      // Insert into LIPP
+      for (const auto& kv : snapshot) {
+        lipp_.Insert(kv, 0);
+      }
+
+      // Clear DPGM and create new instance
+      dpgm_ = DynamicPGM<KeyType, SearchClass, pgm_error>(std::vector<int>());
+      
+      is_flushing_.store(false);
+    } catch (const std::exception& e) {
+      std::cerr << "Error during flush: " << e.what() << std::endl;
+      is_flushing_.store(false);
     }
-
-    // Insert into LIPP
-    for (const auto& kv : snapshot) {
-      lipp_.Insert(kv, 0);
-    }
-
-    // Update LIPP element count
-    lipp_element_count_ += count;
-
-    // Clear DPGM and create new instance
-    dpgm_ = DynamicPGM<KeyType, SearchClass, pgm_error>(std::vector<int>());
-
-    // Update last flush time and release flush lock
-    last_flush_time_ = std::chrono::steady_clock::now();
-    is_flushing_.store(false);
   }
 
   DynamicPGM<KeyType, SearchClass, pgm_error> dpgm_;
@@ -158,9 +118,7 @@ class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
   std::atomic<bool> is_flushing_;
   std::atomic<size_t> insert_count_;
   std::thread flush_thread_;
-  double flush_threshold_;
-  size_t lipp_element_count_;
-  std::chrono::steady_clock::time_point last_flush_time_;
+  size_t flush_threshold_;
 };
 
 #endif // TLI_HYBRID_PGM_LIPP_H
