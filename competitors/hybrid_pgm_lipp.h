@@ -35,14 +35,14 @@ public:
   }
 
   uint64_t Build(const std::vector<KeyValue<KeyType>>& data,
-                 size_t num_threads) override
+                 size_t num_threads)
   {
     // just bulk‐load LIPP as before
     return lipp_index_.Build(data, num_threads);
   }
 
   size_t EqualityLookup(const KeyType& key,
-                        uint32_t thread_id) const override
+                        uint32_t thread_id) const
   {
     // If nothing is buffered, go straight to LIPP
     if (insert_count_.load(std::memory_order_relaxed) == 0) {
@@ -64,7 +64,7 @@ public:
 
   uint64_t RangeQuery(const KeyType& lo,
                       const KeyType& hi,
-                      uint32_t thread_id) const override
+                      uint32_t thread_id) const
   {
     std::lock_guard<std::mutex> lk(index_mutex_);
     return dp_index_.RangeQuery(lo, hi, thread_id)
@@ -72,7 +72,7 @@ public:
   }
 
   void Insert(const KeyValue<KeyType>& kv,
-              uint32_t thread_id) override
+              uint32_t thread_id)
   {
     { // buffer the new key/value
       std::lock_guard<std::mutex> buf_lk(buffer_mutex_);
@@ -92,15 +92,15 @@ public:
     }
   }
 
-  std::string name() const override {
+  std::string name() const {
     return "HybridPGMLIPP";
   }
 
-  std::vector<std::string> variants() const override {
+  std::vector<std::string> variants() const {
     return { SearchClass::name(), std::to_string(pgm_error) };
   }
 
-  size_t size() const override {
+  size_t size() const {
     std::lock_guard<std::mutex> lk(index_mutex_);
     return dp_index_.size() + lipp_index_.size();
   }
