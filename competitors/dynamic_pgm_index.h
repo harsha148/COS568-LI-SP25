@@ -9,7 +9,6 @@
 #include "../util.h"
 #include "base.h"
 #include "pgm_index_dynamic.hpp"
-#include "pgm_index.hpp"
 
 template <class KeyType, class SearchClass, size_t pgm_error>
 class DynamicPGM : public Competitor<KeyType, SearchClass> {
@@ -70,7 +69,6 @@ class DynamicPGM : public Competitor<KeyType, SearchClass> {
     vec.push_back(std::to_string(pgm_error));
     return vec;
   }
-  
 
  private:
   DynamicPGMIndex<KeyType, uint64_t, SearchClass, PGMIndex<KeyType, SearchClass, pgm_error, 16>> pgm_;
