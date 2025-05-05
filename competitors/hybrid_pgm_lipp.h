@@ -62,10 +62,10 @@ public:
                 return lipp_index_.EqualityLookup(key, thread_id);
             }
             // 2) approximatePosition pre-filter (O(1) check)
-            auto ap = dp_index_.approximatePosition(key);
-            if (ap.lo >= ap.hi) {
-                return lipp_index_.EqualityLookup(key, thread_id);
-            }
+            // auto ap = dp_index_.approximatePosition(key);
+            // if (ap.lo >= ap.hi) {
+            //     return lipp_index_.EqualityLookup(key, thread_id);
+            // }
         }
 
         // 3) Otherwise do full PGM lookup (cheap, small range) then fallback

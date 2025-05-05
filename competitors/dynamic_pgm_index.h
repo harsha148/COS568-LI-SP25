@@ -74,12 +74,12 @@ class DynamicPGM : public Competitor<KeyType, SearchClass> {
    * Fast O(1) approximate-position check on the underlying PGM.
    * We pull the static PGM at level 18 (MinIndexedLevel) out of the dynamic index.
    */
-  ApproxPos approximatePosition(const KeyType &key) const {
-    // 18 is the default MinIndexedLevel for DynamicPGMIndex
-    // return pgm_.get_pgm(18)
-    //        .find_approximate_position(key);
-    return {0, 0, 1};
-  }
+  // ApproxPos approximatePosition(const KeyType &key) const {
+  //   // 18 is the default MinIndexedLevel for DynamicPGMIndex
+  //   return pgm_.get_pgm(18)
+  //          .find_approximate_position(key);
+  //   // return {0, 0, 1};
+  // }
 
  private:
   DynamicPGMIndex<KeyType, uint64_t, SearchClass, PGMIndex<KeyType, SearchClass, pgm_error, 16>> pgm_;
