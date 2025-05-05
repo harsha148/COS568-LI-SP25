@@ -81,7 +81,7 @@ public:
         // track key membership
         {
             std::lock_guard<std::mutex> lk(set_mutex_);
-            inserted_set_.insert(kv.first);
+            inserted_set_.insert(kv.key);
         }
 
         // PGM insert
