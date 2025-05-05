@@ -58,7 +58,9 @@ class DynamicPGMIndex {
     std::vector<PGMType> pgm;    ///< (i-MinIndexedLevel)th element is the index on the ith level.
 
     const LevelType &get_level(uint8_t level) const { return data[level - min_level]; }
+    const PGMType &get_pgm(uint8_t level) const { return pgm[level - MinIndexedLevel]; }
     LevelType &get_level(uint8_t level) { return data[level - min_level]; }
+    PGMType &get_pgm(uint8_t level) { return pgm[level - MinIndexedLevel]; }
 
     template<bool SkipDeleted, typename In1, typename In2, typename OutIterator>
     static OutIterator merge(In1 first1, In1 last1, In2 first2, In2 last2, OutIterator result) {
@@ -268,8 +270,6 @@ class DynamicPGMIndex {
     }
 
 public:
-    const PGMType &get_pgm(uint8_t level) const { return pgm[level - MinIndexedLevel]; }
-    PGMType &get_pgm(uint8_t level) { return pgm[level - MinIndexedLevel]; }
 
     using key_type = K;
     using mapped_type = V;

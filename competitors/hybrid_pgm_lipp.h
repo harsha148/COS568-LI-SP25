@@ -49,16 +49,16 @@ public:
         }
 
         // 3) Prefilter with approximatePosition
-        auto ap = dp_index_.approximateposition(key);
-        {
-            std::lock_guard<std::mutex> lk(buffer_mutex_);
-            if (buffer_sorted_.empty() ||
-                key < buffer_sorted_[ap.lo].key ||
-                key > buffer_sorted_[ap.hi].key)
-            {
-                return lipp_index_.EqualityLookup(key, thread_id);
-            }
-        }
+        // auto ap = dp_index_.approximateposition(key);
+        // {
+        //     std::lock_guard<std::mutex> lk(buffer_mutex_);
+        //     if (buffer_sorted_.empty() ||
+        //         key < buffer_sorted_[ap.lo].key ||
+        //         key > buffer_sorted_[ap.hi].key)
+        //     {
+        //         return lipp_index_.EqualityLookup(key, thread_id);
+        //     }
+        // }
 
         // 4) Full PGM lookup, then fallback
         size_t res = dp_index_.EqualityLookup(key, thread_id);
