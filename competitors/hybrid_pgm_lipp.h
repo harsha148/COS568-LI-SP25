@@ -38,9 +38,9 @@ public:
     }
 
     uint64_t RangeQuery(const KeyType& lo, const KeyType& hi, uint32_t thread_id) const {
-        if (!insert_ratio_high_) {
-            return lipp_index_.RangeQuery(lo, hi, thread_id);  // Skip DPGM
-        }
+        // if (!insert_ratio_high_) {
+        //     return lipp_index_.RangeQuery(lo, hi, thread_id);  // Skip DPGM
+        // }
         return dp_index_.RangeQuery(lo, hi, thread_id) + lipp_index_.RangeQuery(lo, hi, thread_id);
     }
 
