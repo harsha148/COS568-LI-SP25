@@ -40,6 +40,14 @@ public:
         // if (insert_count_ == 0) {
         //   return lipp_index_.EqualityLookup(key, thread_id);
         // }
+        // Fast path for mostly-read workloads
+        if (insert_count_ < flush_threshold_/10) { // Only 10% full
+            size_t result = lipp_index_.EqualityLookup(key, thread_id);
+            if (result != util::NOT_FOUND) return result;
+            return dp_index_.EqualityLookup(key, thread_id);
+        }
+        
+        // Normal path
         size_t result = dp_index_.EqualityLookup(key, thread_id);
         return (result == util::OVERFLOW || result == util::NOT_FOUND)
             ? lipp_index_.EqualityLookup(key, thread_id)
@@ -66,8 +74,12 @@ public:
         }
         dp_index_.Insert(data, thread_id);
         insert_count_++;
+        // Dynamic threshold adjustment
+        size_t current_threshold = std::max(flush_threshold_, 
+                                      lipp_index_.size() / 10); // Keep DPGM at ~10% of LIPP size
 
-        if (insert_count_ >= flush_threshold_ && !flushing_.exchange(true)) {
+
+        if (insert_count_ >= current_threshold && !flushing_.exchange(true)) {
             dp_index_ = DynamicPGM<KeyType, SearchClass, pgm_error>(std::vector<int>());
             if (flush_thread_.joinable()) flush_thread_.join();
             flush_thread_ = std::thread(&HybridPGMLIPP::flush_to_lipp, this);
@@ -100,9 +112,10 @@ private:
             snapshot.swap(insert_buffer_);
             insert_count_ = 0;
         }
-        for (const auto& kv : snapshot) {
-            lipp_index_.Insert(kv, 0);
-        }
+        // for (const auto& kv : snapshot) {
+        //     lipp_index_.Insert(kv, 0);
+        // }
+        lipp_index_.BulkLoad(snapshot);
         flushing_ = false;
     }
 

@@ -52,6 +52,15 @@ public:
         return std::vector<std::string>();
     }
 
+    void BulkLoad(const std::vector<KeyValue<KeyType>>& data) {
+        std::vector<std::pair<KeyType, uint64_t>> loading_data;
+        loading_data.reserve(data.size());
+        for (const auto& itm : data) {
+            loading_data.push_back(std::make_pair(itm.key, itm.value));
+        }
+        lipp_.bulk_load(loading_data.data(), loading_data.size());
+    }
+
     std::size_t size() const { return lipp_.index_size(); } 
 private:
     LIPP<KeyType, uint64_t> lipp_;
