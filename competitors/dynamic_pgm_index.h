@@ -76,8 +76,9 @@ class DynamicPGM : public Competitor<KeyType, SearchClass> {
    */
   ApproxPos approximatePosition(const KeyType &key) const {
     // 18 is the default MinIndexedLevel for DynamicPGMIndex
-    return pgm_.get_pgm(18)
-           .find_approximate_position(key);
+    // return pgm_.get_pgm(18)
+    //        .find_approximate_position(key);
+    return {0, 0, 1};
   }
 
  private:
