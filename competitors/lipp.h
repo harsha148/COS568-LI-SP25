@@ -53,48 +53,33 @@ public:
     }
 
     void BulkLoad(const std::vector<KeyValue<KeyType>>& data) {
-    // Check for empty input
-    if (data.empty()) {
-        return; // Or handle empty case appropriately
-    }
+    if (data.empty()) return;
 
-    // Create a non-const copy
-    std::vector<KeyValue<KeyType>> sorted_data = data;
-    
-    // Sort the copy
-    if (!std::is_sorted(sorted_data.begin(), sorted_data.end(), 
-        [](const auto& a, const auto& b) { return a.key < b.key; })) {
-        std::sort(sorted_data.begin(), sorted_data.end(), 
-            [](const auto& a, const auto& b) { return a.key < b.key; });
-    }
-
-    // Check for duplicate keys (if LIPP requires unique keys)
-    auto it = std::adjacent_find(sorted_data.begin(), sorted_data.end(),
-        [](const auto& a, const auto& b) { return a.key == b.key; });
-    if (it != sorted_data.end()) {
-        std::cerr << "Warning: Duplicate keys found during bulk load\n";
-        // Handle duplicates - either keep last or error out
-        sorted_data.erase(std::unique(sorted_data.begin(), sorted_data.end(),
-            [](const auto& a, const auto& b) { return a.key == b.key; }),
-            sorted_data.end());
-    }
-
+    // Directly create sorted pairs
     std::vector<std::pair<KeyType, uint64_t>> loading_data;
-    loading_data.reserve(sorted_data.size());
-    for (const auto& itm : sorted_data) {
-        if constexpr (std::is_same_v<KeyType, uint64_t>) {
-            loading_data.emplace_back(itm.key, itm.value);
-        } else {
-            // Safe conversion if KeyType is different
-            loading_data.emplace_back(static_cast<KeyType>(itm.key), itm.value);
-        }
+    loading_data.reserve(data.size());
+    for (const auto& itm : data) {
+        loading_data.emplace_back(itm.key, itm.value);
     }
 
-    try {
+    // Sort the pairs directly
+    std::sort(loading_data.begin(), loading_data.end(),
+        [](const auto& a, const auto& b) { return a.first < b.first; });
+
+    // Remove duplicates if needed
+    loading_data.erase(std::unique(loading_data.begin(), loading_data.end(),
+        [](const auto& a, const auto& b) { return a.first == b.first; }),
+        loading_data.end());
+
+    // Verify data before bulk load
+    if (!loading_data.empty()) {
+        for (size_t i = 1; i < loading_data.size(); ++i) {
+            if (loading_data[i].first <= loading_data[i-1].first) {
+                std::cerr << "Sorting failed at position " << i << "\n";
+                throw std::runtime_error("Invalid sort order");
+            }
+        }
         lipp_.bulk_load(loading_data.data(), loading_data.size());
-    } catch (const std::exception& e) {
-        std::cerr << "Bulk load failed: " << e.what() << "\n";
-        throw;
     }
 }
 
