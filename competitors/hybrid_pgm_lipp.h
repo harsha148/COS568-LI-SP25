@@ -16,7 +16,7 @@ public:
     HybridPGMLIPP(const std::vector<int>& params)
         : dp_index_(params), lipp_index_(params), insert_count_(0), flushing_(false)
     {
-        flush_threshold_ = 10000;
+        flush_threshold_ = 100000;
     }
 
     ~HybridPGMLIPP() {
@@ -28,6 +28,13 @@ public:
     }
 
     size_t EqualityLookup(const KeyType& key, uint32_t thread_id) const {
+        if (insert_count_ >= flush_threshold_ && !flushing_.exchange(true)) {
+          if (flush_thread_.joinable()) flush_thread_.join();
+          flush_thread_ = std::thread(&HybridPGMLIPP::flush_to_lipp, this);
+        }
+        if (insert_count_ == 0) {
+          return lipp_index_.EqualityLookup(key, thread_id);
+        }
         size_t result = dp_index_.EqualityLookup(key, thread_id);
         return (result == util::OVERFLOW || result == util::NOT_FOUND)
             ? lipp_index_.EqualityLookup(key, thread_id)
@@ -35,6 +42,10 @@ public:
     }
 
     uint64_t RangeQuery(const KeyType& lo, const KeyType& hi, uint32_t thread_id) const {
+        if (insert_count_ >= flush_threshold_ && !flushing_.exchange(true)) {
+          if (flush_thread_.joinable()) flush_thread_.join();
+          flush_thread_ = std::thread(&HybridPGMLIPP::flush_to_lipp, this);
+        }
         return dp_index_.RangeQuery(lo, hi, thread_id) + lipp_index_.RangeQuery(lo, hi, thread_id);
     }
 
@@ -46,10 +57,10 @@ public:
         dp_index_.Insert(data, thread_id);
         insert_count_++;
 
-        if (insert_count_ >= flush_threshold_ && !flushing_.exchange(true)) {
-            if (flush_thread_.joinable()) flush_thread_.join();
-            flush_thread_ = std::thread(&HybridPGMLIPP::flush_to_lipp, this);
-        }
+        // if (insert_count_ >= flush_threshold_ && !flushing_.exchange(true)) {
+        //     if (flush_thread_.joinable()) flush_thread_.join();
+        //     flush_thread_ = std::thread(&HybridPGMLIPP::flush_to_lipp, this);
+        // }
     }
 
     std::string name() const {
