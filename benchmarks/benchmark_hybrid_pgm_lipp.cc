@@ -21,7 +21,7 @@ template <int record>
 void benchmark_64_hybrid_pgm_lipp(tli::Benchmark<uint64_t>& benchmark,
                                   const std::string& filename) {
   if (filename.find("fb_100M") != std::string::npos) {
-    benchmark.template Run<HybridPGMLIPP<uint64_t, BranchingBinarySearch<record>, 16>>();
+    benchmark.template Run<HybridPGMLIPP<uint64_t, BranchingBinarySearch<record>, 128>>();
   }
 }
 
