@@ -29,8 +29,8 @@ public:
 
     size_t EqualityLookup(const KeyType& key, uint32_t thread_id) const {
         if (insert_count_ >= flush_threshold_ && !flushing_.exchange(true)) {
-          if (flush_thread_.joinable()) flush_thread_.join();
-          flush_thread_ = std::thread(&HybridPGMLIPP::flush_to_lipp, this);
+            if (flush_thread_.joinable()) flush_thread_.join();
+            flush_thread_ = std::thread(&HybridPGMLIPP::flush_to_lipp, this);
         }
         if (insert_count_ == 0) {
           return lipp_index_.EqualityLookup(key, thread_id);
@@ -43,8 +43,8 @@ public:
 
     uint64_t RangeQuery(const KeyType& lo, const KeyType& hi, uint32_t thread_id) const {
         if (insert_count_ >= flush_threshold_ && !flushing_.exchange(true)) {
-          if (flush_thread_.joinable()) flush_thread_.join();
-          flush_thread_ = std::thread(&HybridPGMLIPP::flush_to_lipp, this);
+            if (flush_thread_.joinable()) flush_thread_.join();
+            flush_thread_ = std::thread(&HybridPGMLIPP::flush_to_lipp, this);
         }
         return dp_index_.RangeQuery(lo, hi, thread_id) + lipp_index_.RangeQuery(lo, hi, thread_id);
     }
@@ -102,7 +102,7 @@ private:
     std::mutex buffer_mutex_;
     size_t insert_count_;
     size_t flush_threshold_;
-    std::atomic<bool> flushing_;
-    std::thread flush_thread_;
+    mutable std::atomic<bool> flushing_;
+    mutable std::thread flush_thread_;
 
 };
