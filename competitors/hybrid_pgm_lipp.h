@@ -15,13 +15,13 @@
 template<class KeyType, class SearchClass, size_t pgm_error>
 class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
 public:
-    // Constructor: initialize both indexes and launch the background flush thread
+    // Constructor: initialize both indexes and launch background flush thread
     HybridPGMLIPP(const std::vector<int>& params)
       : dp_index_(params),
         lipp_index_(params),
         insert_count_(0),
-        stop_flag_(false),
-        flush_threshold_(100000)
+        flush_threshold_(100000),
+        stop_flag_(false)
     {
         flush_thread_ = std::thread(&HybridPGMLIPP::flushWorker, this);
     }
@@ -35,15 +35,17 @@ public:
         }
     }
 
-    // Bulk‐load phase: we delegate entirely to LIPP for build
+    // Bulk‐load: delegate entirely to LIPP
     uint64_t Build(const std::vector<KeyValue<KeyType>>& data,
                    size_t num_threads)
     {
         return lipp_index_.Build(data, num_threads);
     }
 
-    // Equality lookup: first try PGM, if not found or overflow, fall back to LIPP
-    size_t EqualityLookup(const KeyType& key, uint32_t thread_id) const override {
+    // Equality lookup: first try PGM, if not found/overflow, fall back to LIPP
+    size_t EqualityLookup(const KeyType& key,
+                          uint32_t thread_id) const
+    {
         size_t res = dp_index_.EqualityLookup(key, thread_id);
         if (res == util::OVERFLOW || res == util::NOT_FOUND) {
             return lipp_index_.EqualityLookup(key, thread_id);
@@ -51,27 +53,30 @@ public:
         return res;
     }
 
-    // Range query: sum results from PGM and from LIPP
+    // Range query: sum results from PGM and LIPP
     uint64_t RangeQuery(const KeyType& lo, const KeyType& hi,
-                        uint32_t thread_id) const override
+                        uint32_t thread_id) const
     {
         return dp_index_.RangeQuery(lo, hi, thread_id)
              + lipp_index_.RangeQuery(lo, hi, thread_id);
     }
 
-    // Insert: buffer into PGM, schedule batch flush when threshold reached
-    void Insert(const KeyValue<KeyType>& kv, uint32_t thread_id) override {
-        // 1) Buffer the new key/value for later LIPP insertion
+    // Insert: buffer for LIPP, immediately insert into PGM,
+    // then enqueue a batch when threshold is reached
+    void Insert(const KeyValue<KeyType>& kv,
+                uint32_t thread_id)
+    {
+        // 1) Buffer for later LIPP insertion
         {
             std::lock_guard<std::mutex> buf_lock(buffer_mutex_);
             insert_buffer_.push_back(kv);
             ++insert_count_;
         }
 
-        // 2) Immediately insert into the PGM index
+        // 2) Immediate PGM insert
         dp_index_.Insert(kv, thread_id);
 
-        // 3) If we've accumulated enough, snapshot & enqueue for background flush
+        // 3) Flush if we've buffered enough
         if (insert_count_ >= flush_threshold_) {
             std::vector<KeyValue<KeyType>> batch;
             {
@@ -87,26 +92,25 @@ public:
         }
     }
 
-    // Metadata
-    std::string name() const override {
+    // Metadata to satisfy Competitor interface
+    std::string name() const {
         return "HybridPGMLIPP";
     }
-    std::vector<std::string> variants() const override {
+    std::vector<std::string> variants() const {
         return { SearchClass::name(), std::to_string(pgm_error) };
     }
-    size_t size() const override {
+    size_t size() const {
         return dp_index_.size() + lipp_index_.size();
     }
 
-    // Use this to filter out unsuitable workloads (here we accept all)
     bool applicable(bool unique, bool range_query, bool insert,
-                    bool multithread, const std::string& ops_filename) const override
+                    bool multithread, const std::string& ops_filename) const
     {
         return true;
     }
 
 private:
-    // Background worker: pop batches and do bulk‐inserts into LIPP
+    // Background flush worker
     void flushWorker() {
         while (true) {
             std::vector<KeyValue<KeyType>> batch;
@@ -120,27 +124,27 @@ private:
                 batch = std::move(flush_queue_.front());
                 flush_queue_.pop();
             }
-            // Bulk‐insert into LIPP (thread_id = 0 for simplicity)
+            // Bulk‐insert into LIPP (thread‑id 0 for simplicity)
             for (auto &kv : batch) {
-                lipp_index_.Insert(kv, 0);
+                lipp_index_.Insert(kv, /*thread_id=*/0u);
             }
         }
     }
 
     // Underlying indexes
     DynamicPGM<KeyType, SearchClass, pgm_error> dp_index_;
-    Lipp<KeyType>                         lipp_index_;
+    Lipp<KeyType>                              lipp_index_;
 
-    // Buffering pending inserts for LIPP
-    std::vector<KeyValue<KeyType>>       insert_buffer_;
-    size_t                               insert_count_;
-    size_t                               flush_threshold_;
-    std::mutex                           buffer_mutex_;
+    // Buffering for pending LIPP inserts
+    std::vector<KeyValue<KeyType>>           insert_buffer_;
+    size_t                                   insert_count_;
+    size_t                                   flush_threshold_;
+    std::mutex                               buffer_mutex_;
 
-    // Flush‐queue and worker synchronization
-    std::thread                          flush_thread_;
-    std::mutex                           flush_mutex_;
-    std::condition_variable              flush_cv_;
+    // Flush‑queue and synchronization
+    std::thread                              flush_thread_;
+    std::mutex                               flush_mutex_;
+    std::condition_variable                  flush_cv_;
     std::queue<std::vector<KeyValue<KeyType>>> flush_queue_;
-    std::atomic<bool>                    stop_flag_;
+    std::atomic<bool>                        stop_flag_;
 };
