@@ -58,7 +58,9 @@ class DynamicPGMIndex {
     std::vector<PGMType> pgm;    ///< (i-MinIndexedLevel)th element is the index on the ith level.
 
     const LevelType &get_level(uint8_t level) const { return data[level - min_level]; }
+public:
     const PGMType &get_pgm(uint8_t level) const { return pgm[level - MinIndexedLevel]; }
+private:
     LevelType &get_level(uint8_t level) { return data[level - min_level]; }
     PGMType &get_pgm(uint8_t level) { return pgm[level - MinIndexedLevel]; }
 
