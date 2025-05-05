@@ -88,7 +88,7 @@ static void* DoOpsCoreLoop(void* param) {
       wipe_cache();
     }
 
-    // uint64_t timing = 0;
+    uint64_t timing = 0;
     if constexpr (time_each) {
       if constexpr (multithread){
         thread_clock_start = boost::chrono::thread_clock::now();
