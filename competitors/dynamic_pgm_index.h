@@ -70,8 +70,20 @@ class DynamicPGM : public Competitor<KeyType, SearchClass> {
     vec.push_back(std::to_string(pgm_error));
     return vec;
   }
+  /// Expose the raw static‐PGM index inside the dynamic wrapper
+  const PGMIndex<KeyType,SearchClass,pgm_error,16>&
+  getStaticPGM() const {
+    // `pgm_` is your dynamic index type, but it *contains* a
+    // PGMIndex<…> internally (the 4th template argument).
+    // We need to grab it.  The exact member name will depend on
+    // how `DynamicPGMIndex` is implemented — here I’ll call it `.base_index_`
+    // but you’ll need to substitute the real field name:
+    return pgm_.base_index_;
+  }
+
+  /// The requested approximatePosition API
   ApproxPos approximatePosition(const KeyType &key) const {
-      return pgm_.find_approximate_position(key);
+    return getStaticPGM().find_approximate_position(key);
   }
 
  private:
