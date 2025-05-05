@@ -9,7 +9,7 @@
 #include "../util.h"
 #include "base.h"
 #include "pgm_index_dynamic.hpp"
-#include "pgm_index.hpp"
+#include "pgm_index.hpp"  // for ApproxPos and find_approximate_position
 
 template <class KeyType, class SearchClass, size_t pgm_error>
 class DynamicPGM : public Competitor<KeyType, SearchClass> {
@@ -70,20 +70,13 @@ class DynamicPGM : public Competitor<KeyType, SearchClass> {
     vec.push_back(std::to_string(pgm_error));
     return vec;
   }
-  /// Expose the raw static‐PGM index inside the dynamic wrapper
-  const PGMIndex<KeyType,SearchClass,pgm_error,16>&
-  getStaticPGM() const {
-    // `pgm_` is your dynamic index type, but it *contains* a
-    // PGMIndex<…> internally (the 4th template argument).
-    // We need to grab it.  The exact member name will depend on
-    // how `DynamicPGMIndex` is implemented — here I’ll call it `.base_index_`
-    // but you’ll need to substitute the real field name:
-    return pgm_.base_index_;
-  }
-
-  /// The requested approximatePosition API
+    /**
+   * Fast O(1) approximate-position check on the underlying PGM.
+   * We pull the static PGM at level 18 (MinIndexedLevel) out of the dynamic index.
+   */
   ApproxPos approximatePosition(const KeyType &key) const {
-    return getStaticPGM().find_approximate_position(key);
+    // 18 is the default MinIndexedLevel for DynamicPGMIndex
+    return pgm_.get_pgm(18).find_approximate_position(key);
   }
 
  private:
