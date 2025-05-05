@@ -68,7 +68,7 @@ public:
         insert_count_++;
 
         if (insert_count_ >= flush_threshold_ && !flushing_.exchange(true)) {
-            dpgm_ = DynamicPGM<KeyType, SearchClass, pgm_error>(std::vector<int>());
+            dp_index_ = DynamicPGM<KeyType, SearchClass, pgm_error>(std::vector<int>());
             if (flush_thread_.joinable()) flush_thread_.join();
             flush_thread_ = std::thread(&HybridPGMLIPP::flush_to_lipp, this);
         }
