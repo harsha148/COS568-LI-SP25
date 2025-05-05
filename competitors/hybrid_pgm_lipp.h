@@ -113,9 +113,11 @@ private:
             snapshot.swap(insert_buffer_);
             insert_count_ = 0;
         }
-        for (const auto& kv : snapshot) {
-            lipp_index_.Insert(kv, 0);
-        }
+        // for (const auto& kv : snapshot) {
+        //     lipp_index_.Insert(kv, 0);
+        // }
+        // Bulk load instead of individual inserts
+        lipp_index_.BulkLoad(snapshot);
         flushing_ = false;
     }
 
