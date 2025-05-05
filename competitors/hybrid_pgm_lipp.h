@@ -188,8 +188,8 @@ private:
     size_t                               insert_count_;
 
     // **NEW** counters you forgot to declare:
-    std::atomic<size_t> op_count_{0};
-    std::atomic<size_t> insert_op_count_{0};
+    mutable std::atomic<size_t> op_count_{0};
+    mutable std::atomic<size_t> insert_op_count_{0};
 
     // Adaptive threshold & EWMA state
     std::atomic<size_t>                  flush_threshold_;
