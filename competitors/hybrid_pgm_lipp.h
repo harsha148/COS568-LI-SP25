@@ -16,7 +16,7 @@ template<class KeyType, class SearchClass, size_t pgm_error>
 class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
 public:
     HybridPGMLIPP(const std::vector<int>& params)
-        : dp_index_(params), lipp_index_(params), insert_count_(0), flushing_(false) {
+        : dp_index_(params), lipp_index_(params), insert_count_(0),total_count(0), flushing_(false) {
         flush_threshold_ = 10000; // Default threshold
     }
 
@@ -53,7 +53,7 @@ public:
         uint64_t build_time = util::timing([&] {
             lipp_index_.BulkLoad(data);
         });
-        
+        total_count = data.size();
         return build_time;
     }
 
@@ -94,13 +94,11 @@ public:
         
         dp_index_.Insert(data, thread_id);
         insert_count_++;
+        total_count++;
         stats_.total_inserts++;
 
         // Dynamic threshold adjustment based on LIPP size
-        size_t current_threshold = std::max<size_t>(
-            flush_threshold_, 
-            lipp_index_.size() ? lipp_index_.size() / 10 : 10000
-        );
+        size_t current_threshold = std::max<size_t>(flush_threshold_,total_count / 10);
 
         if (insert_count_ >= current_threshold && !flushing_.exchange(true)) {
             dp_index_ = DynamicPGM<KeyType, SearchClass, pgm_error>(std::vector<int>());
@@ -186,6 +184,7 @@ private:
     std::vector<KeyValue<KeyType>> insert_buffer_;
     std::mutex buffer_mutex_;
     size_t insert_count_;
+    size_t total_count;
     size_t flush_threshold_;
     mutable std::atomic<bool> flushing_;
     mutable std::thread flush_thread_;
