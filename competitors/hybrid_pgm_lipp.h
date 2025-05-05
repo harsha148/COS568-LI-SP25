@@ -49,7 +49,7 @@ public:
         }
 
         // 3) Prefilter with approximatePosition
-        auto ap = dp_index_.find_approximate_position(key);
+        auto ap = dp_index_.approximateposition(key);
         {
             std::lock_guard<std::mutex> lk(buffer_mutex_);
             if (buffer_sorted_.empty() ||
