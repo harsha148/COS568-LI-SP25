@@ -14,9 +14,9 @@ template<class KeyType, class SearchClass, size_t pgm_error>
 class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
 public:
     HybridPGMLIPP(const std::vector<int>& params)
-        : dp_index_(params), lipp_index_(params), insert_count_(0), flushing_(false), insert_ratio_high_(false)
+        : dp_index_(params), lipp_index_(params), insert_count_(0), flushing_(false)
     {
-        flush_threshold_ = 100000;  // Used only when insert_ratio_high_ is true
+        flush_threshold_ = 100000;  
     }
 
     ~HybridPGMLIPP() {
@@ -28,9 +28,9 @@ public:
     }
 
     size_t EqualityLookup(const KeyType& key, uint32_t thread_id) const {
-        if (!insert_ratio_high_) {
-            return lipp_index_.EqualityLookup(key, thread_id);  // Skip DPGM
-        }
+        // if (!insert_ratio_high_) {
+        //     return lipp_index_.EqualityLookup(key, thread_id);  // Skip DPGM
+        // }
         size_t result = dp_index_.EqualityLookup(key, thread_id);
         return (result == util::OVERFLOW || result == util::NOT_FOUND)
             ? lipp_index_.EqualityLookup(key, thread_id)
@@ -45,10 +45,10 @@ public:
     }
 
     void Insert(const KeyValue<KeyType>& data, uint32_t thread_id) {
-        if (!insert_ratio_high_) {
-            lipp_index_.Insert(data, thread_id);  // Skip DPGM entirely
-            return;
-        }
+        // if (!insert_ratio_high_) {
+        //     lipp_index_.Insert(data, thread_id);  // Skip DPGM entirely
+        //     return;
+        // }
 
         {
             std::lock_guard<std::mutex> guard(buffer_mutex_);
@@ -78,10 +78,10 @@ public:
     // Infer insert ratio from ops filename to guide insert behavior
     bool applicable(bool unique, bool range_query, bool insert, bool multithread,
                     const std::string& ops_filename) const {
-        if (ops_filename.find("0.900000i") != std::string::npos)
-            insert_ratio_high_ = true;
-        else
-            insert_ratio_high_ = false;
+        // if (ops_filename.find("0.900000i") != std::string::npos)
+        //     insert_ratio_high_ = true;
+        // else
+        //     insert_ratio_high_ = false;
         return !multithread;
     }
 
@@ -109,5 +109,5 @@ private:
     std::atomic<bool> flushing_;
     std::thread flush_thread_;
 
-    mutable bool insert_ratio_high_;  // dynamically set in `applicable()`
+    // mutable bool insert_ratio_high_;  // dynamically set in `applicable()`
 };
