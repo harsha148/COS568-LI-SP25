@@ -53,6 +53,11 @@ public:
     }
 
     void BulkLoad(const std::vector<KeyValue<KeyType>>& data) {
+    // Check for empty input
+    if (data.empty()) {
+        return; // Or handle empty case appropriately
+    }
+
     // Create a non-const copy
     std::vector<KeyValue<KeyType>> sorted_data = data;
     
@@ -63,12 +68,34 @@ public:
             [](const auto& a, const auto& b) { return a.key < b.key; });
     }
 
+    // Check for duplicate keys (if LIPP requires unique keys)
+    auto it = std::adjacent_find(sorted_data.begin(), sorted_data.end(),
+        [](const auto& a, const auto& b) { return a.key == b.key; });
+    if (it != sorted_data.end()) {
+        std::cerr << "Warning: Duplicate keys found during bulk load\n";
+        // Handle duplicates - either keep last or error out
+        sorted_data.erase(std::unique(sorted_data.begin(), sorted_data.end(),
+            [](const auto& a, const auto& b) { return a.key == b.key; }),
+            sorted_data.end());
+    }
+
     std::vector<std::pair<KeyType, uint64_t>> loading_data;
     loading_data.reserve(sorted_data.size());
     for (const auto& itm : sorted_data) {
-        loading_data.push_back(std::make_pair(itm.key, itm.value));
+        if constexpr (std::is_same_v<KeyType, uint64_t>) {
+            loading_data.emplace_back(itm.key, itm.value);
+        } else {
+            // Safe conversion if KeyType is different
+            loading_data.emplace_back(static_cast<KeyType>(itm.key), itm.value);
+        }
     }
-    lipp_.bulk_load(loading_data.data(), loading_data.size());
+
+    try {
+        lipp_.bulk_load(loading_data.data(), loading_data.size());
+    } catch (const std::exception& e) {
+        std::cerr << "Bulk load failed: " << e.what() << "\n";
+        throw;
+    }
 }
 
     std::size_t size() const { return lipp_.index_size(); } 
