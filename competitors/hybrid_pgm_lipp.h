@@ -12,7 +12,6 @@
 #include <vector>
 #include <unordered_set>
 #include <string>
-#include <chrono>
 #include <algorithm>
 
 template<class KeyType, class SearchClass, size_t pgm_error>
@@ -22,22 +21,17 @@ public:
       : dp_index_(params),
         lipp_index_(params),
         insert_count_(0),
-        flush_threshold_(100000),
-        avg_flush_ms_(10.0),
-        // We will compute target dynamically between these:
-        low_target_flush_ms_(5.0),
-        high_target_flush_ms_(50.0),
-        alpha_(0.2),
-        min_threshold_(10000),
-        max_threshold_(500000),
-        op_count_(0),
-        insert_op_count_(0),
+        flush_threshold_(0),
+        initial_size_(0),
+        lipp_key_count_(0),
         stop_flag_(false)
     {
+        // Start the background flush thread
         flush_thread_ = std::thread(&HybridPGMLIPP::flushWorker, this);
     }
 
     ~HybridPGMLIPP() {
+        // Signal and join flush thread
         stop_flag_.store(true);
         flush_cv_.notify_one();
         if (flush_thread_.joinable()) {
@@ -45,85 +39,77 @@ public:
         }
     }
 
+    // Build: bulk-load into LIPP, then set static threshold = 5% of initial data size
     uint64_t Build(const std::vector<KeyValue<KeyType>>& data,
                    size_t num_threads)
     {
-        return lipp_index_.Build(data, num_threads);
+        uint64_t bytes = lipp_index_.Build(data, num_threads);
+        initial_size_ = data.size();
+        // Initialize LIPP key count and threshold
+        lipp_key_count_.store(initial_size_);
+        size_t threshold = (initial_size_ * 5 + 99) / 100;  // 5% rounded up
+        if (threshold == 0) threshold = 1;
+        flush_threshold_.store(threshold);
+        return bytes;
     }
 
+    // Equality lookup: try PGM for recent inserts, else LIPP
     size_t EqualityLookup(const KeyType& key,
                           uint32_t thread_id) const
     {
-        // Track total operations
-        op_count_.fetch_add(1);
-
-        // If recently inserted, try PGM first
-        {
-            std::lock_guard<std::mutex> lk(set_mutex_);
-            if (inserted_set_.count(key)) {
-                size_t res = dp_index_.EqualityLookup(key, thread_id);
-                if (res != util::NOT_FOUND && res != util::OVERFLOW)
-                    return res;
-            }
+        std::lock_guard<std::mutex> lk(set_mutex_);
+        if (inserted_set_.count(key)) {
+            size_t res = dp_index_.EqualityLookup(key, thread_id);
+            if (res != util::NOT_FOUND && res != util::OVERFLOW)
+                return res;
         }
-        // Otherwise (or on PGM miss), go to LIPP directly
         return lipp_index_.EqualityLookup(key, thread_id);
     }
 
+    // Range query: sum results from PGM and LIPP
     uint64_t RangeQuery(const KeyType& lo, const KeyType& hi,
                         uint32_t thread_id) const
     {
-        // Still sum both, as range queries span both indexes
         return dp_index_.RangeQuery(lo, hi, thread_id)
              + lipp_index_.RangeQuery(lo, hi, thread_id);
     }
 
+    // Insert: buffer into PGM, record key, schedule flush when buffer ≥ threshold
     void Insert(const KeyValue<KeyType>& kv,
                 uint32_t thread_id)
     {
-        // Track total and insert ops
-        op_count_.fetch_add(1);
-        insert_op_count_.fetch_add(1);
-
-        // Remember this key for fast-path lookup
         {
             std::lock_guard<std::mutex> lk(set_mutex_);
             inserted_set_.insert(kv.key);
         }
-
-        // Always insert into the PGM index immediately
         dp_index_.Insert(kv, thread_id);
 
-        // Buffer for later LIPP migration
         {
-            std::lock_guard<std::mutex> buf_lock(buffer_mutex_);
+            std::lock_guard<std::mutex> buf_lk(buffer_mutex_);
             insert_buffer_.push_back(kv);
             ++insert_count_;
         }
-
-        // If we’ve buffered enough, snapshot & schedule a background flush
         if (insert_count_ >= flush_threshold_.load()) {
             std::vector<KeyValue<KeyType>> batch;
             {
-                std::lock_guard<std::mutex> buf_lock(buffer_mutex_);
+                std::lock_guard<std::mutex> buf_lk(buffer_mutex_);
                 batch.swap(insert_buffer_);
                 insert_count_ = 0;
             }
             {
-                std::lock_guard<std::mutex> queue_lock(flush_mutex_);
+                std::lock_guard<std::mutex> q_lk(flush_mutex_);
                 flush_queue_.push(std::move(batch));
             }
             flush_cv_.notify_one();
         }
     }
 
+    // Metadata to satisfy Base interface
     std::string name() const { return "HybridPGMLIPP"; }
     std::vector<std::string> variants() const {
         return { SearchClass::name(), std::to_string(pgm_error) };
     }
-    size_t size() const {
-        return dp_index_.size() + lipp_index_.size();
-    }
+    size_t size() const { return dp_index_.size() + lipp_index_.size(); }
     bool applicable(bool unique, bool range_query, bool insert,
                     bool multithread, const std::string& ops_filename) const
     {
@@ -131,7 +117,7 @@ public:
     }
 
 private:
-    // Background flush thread
+    // Background flush worker
     void flushWorker() {
         while (true) {
             std::vector<KeyValue<KeyType>> batch;
@@ -146,62 +132,38 @@ private:
                 flush_queue_.pop();
             }
 
-            // Time the bulk‐insert
-            auto t0 = std::chrono::steady_clock::now();
-            lipp_index_.BulkInsert(batch, 0u);
-            auto t1 = std::chrono::steady_clock::now();
-            double dur_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+            // Bulk-insert the batch into LIPP
+            lipp_index_.BulkInsert(batch, /*thread_id=*/0u);
 
-            // Update EWMA of flush latency
-            double prev = avg_flush_ms_.load();
-            double next = alpha_*dur_ms + (1.0 - alpha_)*prev;
-            avg_flush_ms_.store(next);
-
-            // Compute observed insert ratio
-            double ratio = 0.0;
-            size_t ops = op_count_.load();
-            if (ops) ratio = double(insert_op_count_.load()) / double(ops);
-
-            // Interpolate target flush time
-            double target = low_target_flush_ms_ +
-                            (high_target_flush_ms_ - low_target_flush_ms_) * ratio;
-
-            // Adjust threshold: bigger if heavy‑insert, smaller if heavy‑lookup
-            double scale = target / next;
-            size_t new_thresh = static_cast<size_t>(flush_threshold_.load() * scale);
-            new_thresh = std::clamp(new_thresh, min_threshold_, max_threshold_);
+            // Update LIPP key count and recompute 5% threshold
+            size_t newly_added = batch.size();
+            size_t total_keys = lipp_key_count_.fetch_add(newly_added) + newly_added;
+            size_t new_thresh  = (total_keys * 5 + 99) / 100;
+            if (new_thresh == 0) new_thresh = 1;
             flush_threshold_.store(new_thresh);
         }
     }
 
-    // Underlying indexes
+    // Underlying PGM and LIPP indices
     DynamicPGM<KeyType, SearchClass, pgm_error> dp_index_;
     Lipp<KeyType>                               lipp_index_;
 
-    // Fast‐path lookup for recently inserted keys
+    // Fast-path set of recently inserted keys
     mutable std::mutex                   set_mutex_;
     std::unordered_set<KeyType>          inserted_set_;
 
-    // Buffer for pending LIPP inserts
-    std::mutex                           buffer_mutex_;
-    std::vector<KeyValue<KeyType>>       insert_buffer_;
-    size_t                               insert_count_;
+    // Buffer and counters for pending LIPP migration
+    std::mutex                                    buffer_mutex_;
+    std::vector<KeyValue<KeyType>>               insert_buffer_;
+    size_t                                        insert_count_;
+    std::atomic<size_t>                           flush_threshold_;
+    size_t                                        initial_size_;
+    std::atomic<size_t>                           lipp_key_count_;
 
-    // **NEW** counters you forgot to declare:
-    mutable std::atomic<size_t> op_count_{0};
-    mutable std::atomic<size_t> insert_op_count_{0};
-
-    // Adaptive threshold & EWMA state
-    std::atomic<size_t>                  flush_threshold_;
-    std::atomic<double>                  avg_flush_ms_;
-    double                               low_target_flush_ms_, high_target_flush_ms_;
-    double                               alpha_;
-    size_t                               min_threshold_, max_threshold_;
-
-    // Background‐flush thread & queue
-    std::thread                          flush_thread_;
-    std::mutex                           flush_mutex_;
-    std::condition_variable              flush_cv_;
-    std::queue<std::vector<KeyValue<KeyType>>> flush_queue_;
-    std::atomic<bool>                    stop_flag_;
+    // Flush-thread synchronization
+    std::mutex                                    flush_mutex_;
+    std::condition_variable                       flush_cv_;
+    std::queue<std::vector<KeyValue<KeyType>>>    flush_queue_;
+    std::thread                                   flush_thread_;
+    std::atomic<bool>                             stop_flag_;
 };
