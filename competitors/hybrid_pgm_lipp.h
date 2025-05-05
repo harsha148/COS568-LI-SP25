@@ -174,8 +174,8 @@ private:
     const size_t                              max_flush_;
 
     // Counters for adaptive ratio
-    std::atomic<size_t>                       op_count_;
-    std::atomic<size_t>                       insert_op_count_;
+    mutable std::atomic<size_t>                       op_count_;
+    mutable std::atomic<size_t>                       insert_op_count_;
 
     // Flush‐thread
     std::thread                               flush_thread_;
