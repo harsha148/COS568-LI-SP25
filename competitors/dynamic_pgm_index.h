@@ -9,6 +9,7 @@
 #include "../util.h"
 #include "base.h"
 #include "pgm_index_dynamic.hpp"
+#include "pgm_index.hpp"
 
 template <class KeyType, class SearchClass, size_t pgm_error>
 class DynamicPGM : public Competitor<KeyType, SearchClass> {
@@ -68,6 +69,9 @@ class DynamicPGM : public Competitor<KeyType, SearchClass> {
     vec.push_back(SearchClass::name());
     vec.push_back(std::to_string(pgm_error));
     return vec;
+  }
+  ApproxPos approximatePosition(const KeyType &key) const {
+      return pgm_.find_approximate_position(key);
   }
 
  private:
