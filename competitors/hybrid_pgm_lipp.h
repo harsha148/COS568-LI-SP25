@@ -28,15 +28,15 @@ public:
     }
 
     size_t EqualityLookup(const KeyType& key, uint32_t thread_id) const {
-        if (insert_count_ >= flush_threshold_) {
-            // trigger background flush exactly once
-            auto self = const_cast<HybridPGMLIPP*>(this);
-            if (!self->flushing_.exchange(true)) {
-                if (self->flush_thread_.joinable())
-                    self->flush_thread_.join();
-                self->flush_thread_ = std::thread(&HybridPGMLIPP::flush_to_lipp, self);
-            }
-        }
+        // if (insert_count_ >= flush_threshold_) {
+        //     // trigger background flush exactly once
+        //     auto self = const_cast<HybridPGMLIPP*>(this);
+        //     if (!self->flushing_.exchange(true)) {
+        //         if (self->flush_thread_.joinable())
+        //             self->flush_thread_.join();
+        //         self->flush_thread_ = std::thread(&HybridPGMLIPP::flush_to_lipp, self);
+        //     }
+        // }
         if (insert_count_ == 0) {
           return lipp_index_.EqualityLookup(key, thread_id);
         }
@@ -47,15 +47,15 @@ public:
     }
 
     uint64_t RangeQuery(const KeyType& lo, const KeyType& hi, uint32_t thread_id) const {
-        if (insert_count_ >= flush_threshold_) {
-            // trigger background flush exactly once
-            auto self = const_cast<HybridPGMLIPP*>(this);
-            if (!self->flushing_.exchange(true)) {
-                if (self->flush_thread_.joinable())
-                    self->flush_thread_.join();
-                self->flush_thread_ = std::thread(&HybridPGMLIPP::flush_to_lipp, self);
-            }
-        }
+        // if (insert_count_ >= flush_threshold_) {
+        //     // trigger background flush exactly once
+        //     auto self = const_cast<HybridPGMLIPP*>(this);
+        //     if (!self->flushing_.exchange(true)) {
+        //         if (self->flush_thread_.joinable())
+        //             self->flush_thread_.join();
+        //         self->flush_thread_ = std::thread(&HybridPGMLIPP::flush_to_lipp, self);
+        //     }
+        // }
         return dp_index_.RangeQuery(lo, hi, thread_id) + lipp_index_.RangeQuery(lo, hi, thread_id);
     }
 
@@ -67,10 +67,10 @@ public:
         dp_index_.Insert(data, thread_id);
         insert_count_++;
 
-        // if (insert_count_ >= flush_threshold_ && !flushing_.exchange(true)) {
-        //     if (flush_thread_.joinable()) flush_thread_.join();
-        //     flush_thread_ = std::thread(&HybridPGMLIPP::flush_to_lipp, this);
-        // }
+        if (insert_count_ >= flush_threshold_ && !flushing_.exchange(true)) {
+            if (flush_thread_.joinable()) flush_thread_.join();
+            flush_thread_ = std::thread(&HybridPGMLIPP::flush_to_lipp, this);
+        }
     }
 
     std::string name() const {
@@ -102,6 +102,7 @@ private:
         for (const auto& kv : snapshot) {
             lipp_index_.Insert(kv, 0);
         }
+        dp_index_.clear();
         flushing_ = false;
     }
 
