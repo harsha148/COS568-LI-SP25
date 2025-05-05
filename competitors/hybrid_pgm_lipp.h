@@ -76,7 +76,7 @@ public:
         insert_count_++;
         // Dynamic threshold adjustment
         size_t current_threshold = std::max(flush_threshold_, 
-                                          lipp_index_.size() / 10); // Keep DPGM at ~10% of LIPP size
+                                          lipp_index_.size() / 20); // Keep DPGM at ~5% of LIPP size
 
         if (insert_count_ >= current_threshold && !flushing_.exchange(true)) {
             dp_index_ = DynamicPGM<KeyType, SearchClass, pgm_error>(std::vector<int>());
