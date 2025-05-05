@@ -41,32 +41,6 @@ public:
         lipp_.insert(data.key, data.value);
     }
 
-    // Parallel bulk‐insert: shards inserts across all cores
-    void BulkInsert(const std::vector<KeyValue<KeyType>>& data,
-                    uint32_t /*thread_id*/)
-    {
-        size_t N = data.size();
-        size_t nThreads = std::thread::hardware_concurrency();
-        if (nThreads == 0) nThreads = 1;
-        size_t chunk = (N + nThreads - 1) / nThreads;
-
-        std::vector<std::thread> workers;
-        workers.reserve(nThreads);
-        for (size_t t = 0; t < nThreads; ++t) {
-            size_t start = t * chunk;
-            size_t end   = std::min(start + chunk, N);
-            if (start >= end) break;
-
-            workers.emplace_back([&, start, end]() {
-                for (size_t i = start; i < end; ++i) {
-                    const auto &kv = data[i];
-                    lipp_.insert(kv.key, kv.value);
-                }
-            });
-        }
-        for (auto &th : workers) th.join();
-    }
-
     bool applicable(bool unique, bool range_query, bool insert, bool multithread, const std::string& ops_filename) {
         // LIPP only supports unique keys.
         return unique && !multithread;
