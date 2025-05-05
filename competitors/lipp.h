@@ -53,6 +53,13 @@ public:
     }
 
     void BulkLoad(const std::vector<KeyValue<KeyType>>& data) {
+        // Sort if not already sorted
+        if (!std::is_sorted(data.begin(), data.end(), 
+            [](const auto& a, const auto& b) { return a.key < b.key; })) {
+            std::sort(data.begin(), data.end(), 
+                [](const auto& a, const auto& b) { return a.key < b.key; });
+        }
+
         std::vector<std::pair<KeyType, uint64_t>> loading_data;
         loading_data.reserve(data.size());
         for (const auto& itm : data) {
