@@ -16,7 +16,7 @@ public:
     HybridPGMLIPP(const std::vector<int>& params)
         : dp_index_(params), lipp_index_(params), insert_count_(0), total_insert_count(0),flushing_(false)
     {
-        flush_threshold_ = 100000;
+        flush_threshold_ = 1000000;
     }
 
     ~HybridPGMLIPP() {
