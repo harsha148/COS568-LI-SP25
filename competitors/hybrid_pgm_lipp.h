@@ -17,7 +17,7 @@ class HybridPGMLIPP : public Competitor<KeyType, SearchClass> {
 public:
     HybridPGMLIPP(const std::vector<int>& params)
         : dp_index_(params), lipp_index_(params), insert_count_(0),total_count(0), flushing_(false) {
-        flush_threshold_ = 10000; // Default threshold
+        flush_threshold_ = 1000000; // Default threshold
     }
 
     ~HybridPGMLIPP() {
@@ -95,7 +95,6 @@ public:
         dp_index_.Insert(data, thread_id);
         insert_count_++;
         total_count++;
-        stats_.total_inserts++;
 
         // Dynamic threshold adjustment based on LIPP size
         size_t current_threshold = std::max<size_t>(flush_threshold_,total_count / 10);
@@ -126,17 +125,6 @@ public:
         return !multithread;
     }
 
-    void PrintStats() const {
-        std::cout << "Hybrid Index Stats:\n"
-                  << "  Total inserts: " << stats_.total_inserts << "\n"
-                  << "  Successful flushes: " << stats_.successful_flushes << "\n"
-                  << "  Failed flushes: " << stats_.failed_flushes << "\n"
-                  << "  Items flushed: " << stats_.items_flushed << "\n"
-                  << "  Current buffer size: " << insert_buffer_.size() << "\n"
-                  << "  DPGM size: " << dp_index_.size() << "\n"
-                  << "  LIPP size: " << lipp_index_.size() << std::endl;
-    }
-
 private:
     void flush_to_lipp() {
         std::vector<KeyValue<KeyType>> snapshot;
@@ -162,11 +150,8 @@ private:
         // Safe bulk load with error handling
         try {
             lipp_index_.BulkLoad(snapshot);
-            stats_.successful_flushes++;
-            stats_.items_flushed += snapshot.size();
         } catch (const std::exception& e) {
             std::cerr << "Failed to bulk load to LIPP: " << e.what() << std::endl;
-            stats_.failed_flushes++;
             // Re-insert failed items back to buffer
             std::lock_guard<std::mutex> guard(buffer_mutex_);
             insert_buffer_.insert(insert_buffer_.end(), 
@@ -188,11 +173,4 @@ private:
     size_t flush_threshold_;
     mutable std::atomic<bool> flushing_;
     mutable std::thread flush_thread_;
-
-    struct {
-        size_t total_inserts = 0;
-        size_t successful_flushes = 0;
-        size_t failed_flushes = 0;
-        size_t items_flushed = 0;
-    } stats_;
 };
