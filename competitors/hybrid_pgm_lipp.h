@@ -19,6 +19,7 @@ public:
         lipp_index_(params),
         insert_count_(0),
         total_insert_count_(0),
+        total_ops_count(0),
         flushing_(false),
         flush_threshold_(1000000)
     {}
@@ -34,6 +35,7 @@ public:
         // build LIPP and record base size
         uint64_t t = lipp_index_.Build(data, num_threads);
         total_insert_count_ = data.size();
+        total_ops_count = data.size();
         return t;
     }
 
@@ -42,9 +44,10 @@ public:
                           uint32_t thread_id) const
     {
         std::lock_guard<std::mutex> lk(index_mutex_);
+        total_ops_count++;
 
         // purely read‐heavy? hit LIPP first
-        if (insert_count_ < flush_threshold_/5) {
+        if (total_insert_count_/total_ops_count < 0.5) {
             auto v = lipp_index_.EqualityLookup(key, thread_id);
             if (v != util::NOT_FOUND) return v;
             return dp_index_.EqualityLookup(key, thread_id);
@@ -61,6 +64,7 @@ public:
     uint64_t RangeQuery(const KeyType& lo, const KeyType& hi,
                         uint32_t thread_id) const
     {
+        total_ops_count++;
         std::lock_guard<std::mutex> lk(index_mutex_);
         return dp_index_.RangeQuery(lo, hi, thread_id)
              + lipp_index_.RangeQuery(lo, hi, thread_id);
@@ -74,6 +78,7 @@ public:
             insert_buffer_.push_back(kv);
             insert_count_++;
             total_insert_count_++;
+            total_ops_count++;
         }
 
         {   // PGM insert under index lock
@@ -138,6 +143,7 @@ private:
     std::vector<KeyValue<KeyType>>             insert_buffer_;
     size_t                                     insert_count_;
     size_t                                     total_insert_count_;
+    size_t                                     total_ops_count;
     size_t                                     flush_threshold_;
     std::atomic<bool>                          flushing_;
     std::thread                                flush_thread_;
