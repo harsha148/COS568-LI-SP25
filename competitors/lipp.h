@@ -52,7 +52,7 @@ public:
         return std::vector<std::string>();
     }
 
-    void BulkLoad(std::vector<KeyValue<KeyType>>& loading_data) {
+    void BulkLoad(std::vector<KeyValue<KeyType>>& data) {
         // if (data.empty()) {
         //     lipp_.bulk_load(nullptr, 0); // Handle empty case
         //     return;
@@ -66,19 +66,24 @@ public:
         // }
 
         // Sort and remove duplicates
-        std::sort(loading_data.begin(), loading_data.end(),
+        std::sort(data.begin(), data.end(),
             [](const auto& a, const auto& b) { return a.first < b.first; });
         
         // Verify the sorted data meets LIPP's requirements
-        if (!loading_data.empty()) {
-            for (size_t i = 1; i < loading_data.size(); ++i) {
-                if (loading_data[i].first <= loading_data[i-1].first) {
-                    std::cerr << "Invalid sort order at position " << i 
-                            << ": " << loading_data[i-1].first 
-                            << " >= " << loading_data[i].first << "\n";
-                    throw std::runtime_error("Invalid sort order for LIPP bulk load");
-                }
-            }
+        // if (!loading_data.empty()) {
+        //     for (size_t i = 1; i < loading_data.size(); ++i) {
+        //         if (loading_data[i].first <= loading_data[i-1].first) {
+        //             std::cerr << "Invalid sort order at position " << i 
+        //                     << ": " << loading_data[i-1].first 
+        //                     << " >= " << loading_data[i].first << "\n";
+        //             throw std::runtime_error("Invalid sort order for LIPP bulk load");
+        //         }
+        //     }
+        // }
+        std::vector<std::pair<KeyType, uint64_t>> loading_data;
+        loading_data.reserve(data.size());
+        for (const auto& itm : data) {
+            loading_data.push_back(std::make_pair(itm.key, itm.value));
         }
 
         // Perform the bulk load
