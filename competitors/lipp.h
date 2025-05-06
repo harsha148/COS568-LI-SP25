@@ -58,7 +58,7 @@ public:
         //     return;
         // }
 
-        Create a copy and sort it
+        // Create a copy and sort it
         std::vector<std::pair<KeyType, uint64_t>> loading_data;
         loading_data.reserve(data.size());
         for (const auto& itm : data) {
