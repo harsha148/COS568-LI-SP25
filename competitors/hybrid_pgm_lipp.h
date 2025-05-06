@@ -143,7 +143,7 @@ private:
     std::vector<KeyValue<KeyType>>             insert_buffer_;
     size_t                                     insert_count_;
     size_t                                     total_insert_count_;
-    size_t                                     total_ops_count;
+    mutable size_t                                     total_ops_count;
     size_t                                     flush_threshold_;
     std::atomic<bool>                          flushing_;
     std::thread                                flush_thread_;
