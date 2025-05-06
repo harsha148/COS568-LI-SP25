@@ -85,6 +85,7 @@ public:
         size_t dyn_thresh = std::max(flush_threshold_, total_insert_count_/20);
 
         if (insert_count_ >= dyn_thresh && !flushing_.exchange(true)) {
+            dp_index_ = DynamicPGM<KeyType, SearchClass, pgm_error>(std::vector<int>());
             // join previous flush if any
             if (flush_thread_.joinable()) flush_thread_.join();
             // launch new flush
@@ -123,7 +124,6 @@ private:
             for (auto &kv : batch) {
                 lipp_index_.Insert(kv, /*thread=*/0u);
             }
-            dp_index_.clear();
         }
 
         flushing_.store(false);
