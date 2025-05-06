@@ -43,8 +43,8 @@ public:
     size_t EqualityLookup(const KeyType& key,
                           uint32_t thread_id) const
     {
-        std::lock_guard<std::mutex> lk(index_mutex_);
         total_ops_count++;
+        std::lock_guard<std::mutex> lk(index_mutex_);
 
         // purely read‐heavy? hit LIPP first
         if (total_insert_count_/total_ops_count < 0.5) {
