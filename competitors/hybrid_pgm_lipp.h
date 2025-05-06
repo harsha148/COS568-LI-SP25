@@ -139,13 +139,13 @@ private:
         }
 
         // Sort and prepare data for LIPP
-        std::sort(snapshot.begin(), snapshot.end(),
-            [](const auto& a, const auto& b) { return a.key < b.key; });
+        // std::sort(snapshot.begin(), snapshot.end(),
+        //     [](const auto& a, const auto& b) { return a.key < b.key; });
 
-        // Remove duplicates if needed
-        snapshot.erase(std::unique(snapshot.begin(), snapshot.end(),
-            [](const auto& a, const auto& b) { return a.key == b.key; }),
-            snapshot.end());
+        // // Remove duplicates if needed
+        // snapshot.erase(std::unique(snapshot.begin(), snapshot.end(),
+        //     [](const auto& a, const auto& b) { return a.key == b.key; }),
+        //     snapshot.end());
 
         // Safe bulk load with error handling
         try {

@@ -52,21 +52,21 @@ public:
         return std::vector<std::string>();
     }
 
-    void BulkLoad(std::vector<KeyValue<KeyType>>& data) {
+    void BulkLoad(const std::vector<KeyValue<KeyType>>& data) {
         // if (data.empty()) {
         //     lipp_.bulk_load(nullptr, 0); // Handle empty case
         //     return;
         // }
 
-        // Create a copy and sort it
-        // std::vector<std::pair<KeyType, uint64_t>> loading_data;
-        // loading_data.reserve(data.size());
-        // for (const auto& itm : data) {
-        //     loading_data.emplace_back(itm.key, itm.value);
-        // }
+        Create a copy and sort it
+        std::vector<std::pair<KeyType, uint64_t>> loading_data;
+        loading_data.reserve(data.size());
+        for (const auto& itm : data) {
+            loading_data.emplace_back(itm.key, itm.value);
+        }
 
         // Sort and remove duplicates
-        std::sort(data.begin(), data.end(),
+        std::sort(loading_data.begin(), loading_data.end(),
             [](const auto& a, const auto& b) { return a.first < b.first; });
         
         // Verify the sorted data meets LIPP's requirements
@@ -80,11 +80,11 @@ public:
         //         }
         //     }
         // }
-        std::vector<std::pair<KeyType, uint64_t>> loading_data;
-        loading_data.reserve(data.size());
-        for (const auto& itm : data) {
-            loading_data.push_back(std::make_pair(itm.key, itm.value));
-        }
+        // std::vector<std::pair<KeyType, uint64_t>> loading_data;
+        // loading_data.reserve(data.size());
+        // for (const auto& itm : data) {
+        //     loading_data.push_back(std::make_pair(itm.key, itm.value));
+        // }
 
         // Perform the bulk load
         try {
